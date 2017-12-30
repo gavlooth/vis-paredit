@@ -21,40 +21,61 @@ function basic_sexp_patern (a,b)
   return a *  (l.any - b)^0 * b
 end
 
-function search_for_patern (p)
+function search_patern (p)
   local I = lpeg.Cp()
   return (1 - lpeg.P(p))^0 * I * p * I
 end
 
-local composed_sexp_paternt  =  (basic_sexp_patern('"','"') + basic_sexp_patern('(',')') +  basic_sexp_patern('[',']') + basic_sexp_patern('{','}') + l.graph^0 )
+local composed_sexp_paternt  =  (basic_sexp_patern('"','"') +
+                                basic_sexp_patern('(',')') +
+                                basic_sexp_patern('[',']') +
+                                basic_sexp_patern('{','}') + l.graph^0)
 
-function next_sexp (start_pos)
-local Range
- Range.start, Range.finish =  search_for_patern(composed_sexp_paternt)
+function next_sexp (pos)
+ local Range = {}
+ local text = vis.win.file:content(pos,vis.win.file.size)
+ local start, finish = match(search_patern(composed_sexp_paternt), text )
+ Range.start , Range.finish = start + pos, finish + pos
  return Range
 end
 
-function previus_sexp (pos)
-  local file, current_pos, sexp_pos  = vis.win.file, 0, nil
-  while current_pos < pos  do
-    sexp_pos = next_sexp(current_pos)
-    if sexp_pos.start == nil then current_pos = current_pos + 1 else
-      current_pos = sexp_pos.start end
+function advance_search (starting_pos, pos)
+  print(tostring(starting_pos) .."--" .. tostring(pos))
+  local sexp_pos = next_sexp(starting_pos)
+    if sexp_pos.finish == nil then
+      return advance_search (starting_pos + 1,pos  )
+    elseif  sexp_pos.finish < pos then
+      return  advance_search (sexp_pos.finish, pos)
+    else return sexp_pos
   end
-  return
+  return Range
 end
 
 
 function move_sexp (current_pos, target_pos)
-   local file, cursor_char = vis.win.file, vis.win.file:content(current_pos,1)
+  local file, cursor_char = vis.win.file, vis.win.file:content(current_pos,1)
    if  match_sexp[cursor_char] ~= nil then
        file:insert(target_pos,  cursor_char)
        file:delete(current_pos, 1)
    end
 end
 
-function balance_sexp (key)
 
+
+function advance_sexp_search (start_pos, end_pos)
+  print(start_pos)
+  local start , finish = vis.win.file:match_at(composed_sexp_paternt, start_pos)
+  if finish == nil then
+    return advance_sexp_search (start_pos + 1, end_pos )
+  elseif  finish < end_pos then
+    print(finish)
+    return advance_sexp_search (finish, end_pos)
+  else return {start = start, finish = finish}
+  end
+end
+
+
+function balance_sexp (key)
  if key == '(' then
   return function (_) vis:insert('()') return 0 end
  elseif key == '[' then
@@ -69,15 +90,15 @@ end
 function slurp_sexp_forward ()
  local file, pos = vis.win.file,  vis.win.selection.pos
  local the_word =    (l.space + S('\n'))^0 *  composed_sexp_paternt
- local start_pos, end_pos = file:match_at(the_word, pos + 1 )
+ local start_pos, end_pos = file:match_at(the_word, pos + 1)
  move_sexp(pos, end_pos)
 end
 
-function slurp_sexp_backward ()
+function slurp_sexp_backwards ()
  local file, pos = vis.win.file,  vis.win.selection.pos
- local the_word =  (l.space + S('\n'))^0 * composed_sexp_paternt
- local start_pos, end_pos = file:match_at(the_word, pos + 1 )
- move_sexp(pos, end_pos)
+ local sexp_range = advance_search(0, pos)
+--  vis:info(tostring(sexp_range.start) .. )
+ move_sexp(sexp_range.start, sexp_range.finish)
 end
 
 
@@ -88,7 +109,7 @@ end
    vis:map(vis.modes.INSERT, "{", balance_sexp("{") )
    vis:map(vis.modes.INSERT, '"', balance_sexp('"') )
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
-   vis:map(vis.modes.NORMAL,  '<Space>h',  burf_sexp_backwards  )
+   vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
  end)
 
 
