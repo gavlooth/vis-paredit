@@ -39,25 +39,35 @@ function next_sexp (pos)
  return Range
 end
 
-function advance_search (starting_pos, pos)
-  print(tostring(starting_pos) .."--" .. tostring(pos))
+function advance_search (starting_pos, pos, previus_sexp_pos)
+
   local sexp_pos = next_sexp(starting_pos)
     if sexp_pos.finish == nil then
-      return advance_search (starting_pos + 1,pos  )
+      return advance_search (starting_pos + 1, pos,  previus_sexp_pos )
     elseif  sexp_pos.finish < pos then
-      return  advance_search (sexp_pos.finish, pos)
-    else return sexp_pos
+      return  advance_search (sexp_pos.finish, pos, sexp_pos  )
+    else
+
+      --vis:info(tostring(previus_sexp_pos.start).. "---" .. tostring(previus_sexp_pos.finish))
+      return previus_sexp_pos
   end
-  return Range
 end
 
 
 function move_sexp (current_pos, target_pos)
   local file, cursor_char = vis.win.file, vis.win.file:content(current_pos,1)
-   if  match_sexp[cursor_char] ~= nil then
-       file:insert(target_pos,  cursor_char)
-       file:delete(current_pos, 1)
-   end
+  if  match_sexp[cursor_char] ~= nil then
+    file:insert(target_pos,  cursor_char)
+    if current_pos > target_pos then
+      file:delete(current_pos + 1, 1)
+      vis.win.selection.pos = target_pos
+    elseif current_pos < target_pos then
+      file:delete(current_pos, 1)
+      vis.win.selection.pos = target_pos - 1
+
+
+    end
+  end
 end
 
 
@@ -98,7 +108,7 @@ function slurp_sexp_backwards ()
  local file, pos = vis.win.file,  vis.win.selection.pos
  local sexp_range = advance_search(0, pos)
 --  vis:info(tostring(sexp_range.start) .. )
- move_sexp(sexp_range.start, sexp_range.finish)
+ move_sexp(pos, sexp_range.start - 1)
 end
 
 
