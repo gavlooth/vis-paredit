@@ -12,14 +12,16 @@ local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local str_pattern = ('"' *  ( ( P("\\\"") +    (1 -  S('"'))))^0 * '"' ) ^0
 
-balanced_sexp =   P{str_pattern  *
-                   ("(" * ((1 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * ")") +
-                   ("[" * ((1 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * "]") +
-                   ("{" * ((1 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * "}") +
-                   (lpeg.graph -  S("(){}[]\""))^0 }
+
+local char_sexp_literals = P{"\\" * S('(){}[]"') }
 
 
-
+complete_balanced_sexp =   P{str_pattern  *
+                            ("(" * ((2 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * ")") +
+                            ("[" * ((1 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * "]") +
+                            ("{" * ((1 - S("(){}[]")) * str_pattern + lpeg.V(1))^0 * "}")} +
+                            ((l.graph -  S("(){}[]\""))^0 * char_sexp_literals^0)
+--
 match_sexp = {["("] = ")",
               [")"] = "(",
               ["["] = "]",
@@ -28,32 +30,36 @@ match_sexp = {["("] = ")",
               ["}"] = "{",
               ["\""]="\"" }
 
-local char_literals = P{"\\" * (S('(){}[]"') + R("az", "AZ")) }
+-- local char_literals = P{"\\" * (S('(){}[]"') + R("az", "AZ")) }
 
-local char_sexp_literals = P{"\\" * S('(){}[]"') }
-
-local white_space_literals = P{ "\newline" + "\space" + "\tab" + "\formfeed" + "\backspace" + "\return" }
-
-balanced_sexp = P{ "(" * ((1 - S"()") + lpeg.V(1))^0 * ")"}
+-- local white_space_literals = P{ "\\newline" + "\\space" + "\\tab" + "\\formfeed" + "\\backspace" + "\\return" }
 
 
 
-
-function next_sexp (pos)
- local Range = {}
- local text = vis.win.file:content(pos,vis.win.file.size)
- local start, finish = match(search_patern(the_sexp_pattern), text )
- Range.start , Range.finish = start + pos, finish + pos
- return Range
+function search_patern (p)
+  local I = lpeg.Cp()
+  return (1 - lpeg.P(p))^0 * I * p * I
 end
 
 
-function match_next_sexp (pos)
+function advance_search_step (starting_pos, pos, previus_sexp_pos)
+  local sexp_pos = next_sexp(starting_pos)
+    if sexp_pos.finish == nil then
+      return advance_search_step (starting_pos + 1, pos,  previus_sexp_pos)
+    elseif  sexp_pos.finish < pos then
+      return  advance_search_step (sexp_pos.finish, pos, sexp_pos  )
+    else
+      return previus_sexp_pos
+  end
+end
+
+
+
+function match_next_sexp (pos) --pos + 1 ?
  local Range = {}
+ local I = lpeg.Cp()
  local text = vis.win.file:content(pos,vis.win.file.size)
- local _ search_pos = pos + match( S(" \n")^0 * (1 - S(" \n")), text)
- local half_trimed_text =  vis.win.file:content(search_pos,vis.win.file.size)
- local start, finish = match(balanced_sexp , half_trimed_text)
+ local start, finish = match( S(" \n")^0 * I * complete_balanced_sexp * I, text  )
  Range.start , Range.finish = search_pos + start, search_pos + finish
  return Range
 end
@@ -62,19 +68,20 @@ end
 
 
 
-function basic_sexp_patern (a,b)
-  return a *  (l.any - b)^0 * b
+function get_previus_sexp (starting_pos, pos, previus_sexp_pos)
+  local sexp_pos = match_next_sexp(starting_pos)
+    if sexp_pos.finish == nil then
+      return get_previus_sexp (starting_pos + 1, pos,  previus_sexp_pos)
+    elseif  sexp_pos.finish < pos then
+      return  advance_search_step (sexp_pos.finish, pos, sexp_pos  )
+    else
+      return previus_sexp_pos
+  end
 end
 
-function search_patern (p)
-  local I = lpeg.Cp()
-  return (1 - lpeg.P(p))^0 * I * p * I
-end
 
-local the_sexp_pattern  =      (balanced_delims +
-                                basic_sexp_patern('(',')') +
-                                basic_sexp_patern('[',']') +
-                                basic_sexp_patern('{','}') + l.graph^0)
+balanced_sexp = P{ "(" * ((1 - S"()") + lpeg.V(1))^0 * ")"}
+
 
 function next_sexp (pos)
  local Range = {}
@@ -84,15 +91,21 @@ function next_sexp (pos)
  return Range
 end
 
-function advance_search_step (starting_pos, pos, previus_sexp_pos)
-  local sexp_pos = next_sexp(starting_pos)
-    if sexp_pos.finish == nil then
-      return advance_search_step (starting_pos + 1, pos,  previus_sexp_pos )
-    elseif  sexp_pos.finish < pos then
-      return  advance_search_step (sexp_pos.finish, pos, sexp_pos  )
-    else
-      return previus_sexp_pos
-  end
+function basic_sexp_patern (a,b)
+  return a *  (l.any - b)^0 * b
+end
+
+local the_sexp_pattern  = (str_pattern +
+                           basic_sexp_patern('(',')') +
+                           basic_sexp_patern('[',']') +
+                           basic_sexp_patern('{','}') + l.graph^0)
+
+function next_sexp (pos)
+ local Range = {}
+ local text = vis.win.file:content(pos,vis.win.file.size)
+ local start, finish = match(search_patern(the_sexp_pattern), text )
+ Range.start , Range.finish = start + pos, finish + pos
+ return Range
 end
 
 
