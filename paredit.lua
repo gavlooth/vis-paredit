@@ -4,7 +4,14 @@ local l = require('lexer')
 local match = lpeg.match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
-balanced_sexp = P{ "(" * ((1 - S"()") + lpeg.V(1))^0 * ")" }
+
+
+local balanced_delims =   ('"' *  ( (P("\"") +    (1 -  S('"'))) + lpeg.V(1) )^0 * '"' )
+
+balanced_sexp = P{ balanced_delims +
+                   ( "(" * ((1 - S"(){}[]") + lpeg.V(1))^0 * ")") +
+                   ("[" * ((1 - S"(){}[]") + lpeg.V(1))^0 * "]") +
+                   ( "{" * ((1 - S"(){}[]")  + lpeg.V(1))^0 * "}")}
 
 match_sexp = {["("] = ")",
          [")"] = "(",
@@ -16,13 +23,11 @@ match_sexp = {["("] = ")",
 
 local char_literals = P{"\\" * (S('(){}[]"') + R("az", "AZ")) }
 
+local char_sexp_literals = P{"\\" * S('(){}[]"') }
+
 local white_space_literals = P{ "\newline" + "\space" + "\tab" + "\formfeed" + "\backspace" + "\return" }
 
-local balanced_delims = P ( '"' *  ( (l.any - '"') + P('\\' * '"') )^0 * '"' )
-
-
 balanced_sexp = P{ "(" * ((1 - S"()") + lpeg.V(1))^0 * ")"}
-
 
 function validate_move (old_pos, new_pos)
 
