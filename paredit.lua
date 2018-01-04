@@ -1,15 +1,47 @@
 -- load standard vis module,  providing parts of the Lua API
 require('vis')
+
+
+lisp_file_types ={"clj", "cljs" , "lisp", "cljx", "cljc", "edn"}
+
+function paredit_remove_filetype (x)
+  for k,v in pairs(lisp_file_types)do
+    if v == x  then
+      lisp_file_types[k]=nil
+    end
+  end
+end
+
+
+function paredit_add_filetype (x)
+  if type(x) == "string" then
+    table.insert(lisp_file_types, x)
+  end
+end
+
 local lexers = vis.lexers
 local l = require('lexer')
 local match = lpeg.match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
-
 local char_sexp_literals = P{"\\" * S('(){}[]"') }
 local char_literals = P{"\\" * (l.graph -  S("n\"\\"))}
-
 local str_pattern = ('"' *  ( ( P("\\\"") +    (1 -  S('"'))))^0 * '"')
 local strings_and_chars = str_pattern + char_sexp_literals
+
+function find_first (p)
+  return lpeg.P{ p + 1 * lpeg.V(1) }
+end
+
+function is_lisp_file ()
+local ex = vis.win.file.name
+local matcher = lpeg.P(lisp_file_types[1]) * P(-1)
+for i = 2, #lisp_file_types do
+matcher = matcher + lpeg.P(lisp_file_types[i] ) * P(-1)
+end
+return match(find_first (matcher), ex)
+end
+
+
 
 complete_balanced_sexp =   P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
 ("[" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * "]") +
@@ -30,10 +62,6 @@ match_sexp = {["("] = ")",
 --in order to find the given patternt
 
 
-
-function first_occurance (p)
-  return lpeg.P{ p + 1 * l.V(1) }
-end
 
 function search_patern (p)
   local I = lpeg.Cp()
@@ -133,14 +161,23 @@ function slurp_sexp_backwards ()
   end
 end
 
-vis:map(vis.modes.NORMAL,  '<Space>h', slurp_sexp_backwards)
-vis.events.subscribe(vis.events.INIT, function()
+vis.events.subscribe(vis.events.WIN_OPEN, function()
   vis:map(vis.modes.INSERT, "(", balance_sexp("(") )
   vis:map(vis.modes.INSERT, "[", balance_sexp("[") )
   vis:map(vis.modes.INSERT, "{", balance_sexp("{") )
   vis:map(vis.modes.INSERT, '"', balance_sexp('"') )
-  vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
-  vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
+  if is_lisp_file() ~= nil then
+   vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
+   vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
+ end
 end)
 
+
+--
+-- vis.events.subscribe(vis.events.WIN_OPEN, function(win)
+--
+--
+-- end)
+--
+--
 
