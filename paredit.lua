@@ -61,16 +61,49 @@ match_sexp = {["("] = ")",
 --This function returns a patternt that skips as many characters
 --in order to find the given patternt
 
-
-
 function search_patern (p)
   local I = lpeg.Cp()
   return (1 - lpeg.P(p))^0 * I * p * I
 end
+
+
 function print_two (a,b)
   print ("  " .. tostring (a) .. "--" .. tostring(b))
 end
 
+function is_sexp (start, finish)
+local text = vis.win.file:content(start ,  finish - start)
+return  match(complete_balanced_sexp , text)
+end
+
+
+
+function get_sexp_at_cursor ()
+local current_pos =  vis.win.selection.pos
+vis:feedkeys("F(")
+local sexp = {}
+sexp.start= vis.win.selection.pos
+vis:feedkeys("%")
+sexp.finish = vis.win.selection.pos
+vis.win.selection.pos = current_pos
+return sexp
+end
+
+
+function split_sexp_at_cursor ()
+local current_pos =  vis.win.selection.pos
+
+  local this_sexp = get_sexp_at_cursor()
+if is_sexp(this_sexp) ~= nil then
+  vis:feedkeys("B")
+  local starting_pos =  vis.win.selection.pos
+  if  match (S("()"),  vis.win.file:content(pos , 1)) ~= nil then
+  vis:feedkeys("E")
+  starting_pos =  vis.win.selection.pos
+  file:insert(starting_pos, ")(")
+    end
+  end
+end
 function match_next_sexp (pos) --pos + 1 ?
   local Range = {}
   local I = lpeg.Cp()
@@ -79,7 +112,6 @@ function match_next_sexp (pos) --pos + 1 ?
   if start ~= nil then
     Range.start , Range.finish = pos + start, pos + finish
   end
-  -- print_two(Range.start,Range.finish)
   return Range
 end
 
@@ -169,6 +201,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
   if is_lisp_file() ~= nil then
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
+   vis:map(vis.modes.NORMAL,  '<Space>b', get_sexp_at_cursor)
  end
 end)
 
