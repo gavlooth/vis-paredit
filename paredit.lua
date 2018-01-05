@@ -29,7 +29,8 @@ local str_pattern = ('"' *  ( ( P("\\\"") +    (1 -  S('"'))))^0 * '"')
 local strings_and_chars = str_pattern + char_sexp_literals
 
 function find_first (p)
-  return lpeg.P{ p + 1 * lpeg.V(1) }
+ local I = lpeg.Cp ()
+  return lpeg.P{ I * p * I + 1 * lpeg.V(1) }
 end
 
 function is_lisp_file ()
@@ -40,6 +41,13 @@ matcher = matcher + lpeg.P(lisp_file_types[i] ) * P(-1)
 end
 return match(find_first (matcher), ex)
 end
+
+
+
+
+simple_sexp = P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
+("[" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * "]") +
+("{" * ((1 - S("(){}[]\"")) + strings_and_chars  + lpeg.V(1))^0 * "}")}
 
 
 
@@ -61,11 +69,6 @@ match_sexp = {["("] = ")",
 --This function returns a patternt that skips as many characters
 --in order to find the given patternt
 
-function search_patern (p)
-  local I = lpeg.Cp()
-  return (1 - lpeg.P(p))^0 * I * p * I
-end
-
 
 function print_two (a,b)
   print ("  " .. tostring (a) .. "--" .. tostring(b))
@@ -77,33 +80,6 @@ return  match(complete_balanced_sexp , text)
 end
 
 
-
-function get_sexp_at_cursor ()
-local current_pos =  vis.win.selection.pos
-vis:feedkeys("F(")
-local sexp = {}
-sexp.start= vis.win.selection.pos
-vis:feedkeys("%")
-sexp.finish = vis.win.selection.pos
-vis.win.selection.pos = current_pos
-return sexp
-end
-
-
-function split_sexp_at_cursor ()
-local current_pos =  vis.win.selection.pos
-
-  local this_sexp = get_sexp_at_cursor()
-if is_sexp(this_sexp) ~= nil then
-  vis:feedkeys("B")
-  local starting_pos =  vis.win.selection.pos
-  if  match (S("()"),  vis.win.file:content(pos , 1)) ~= nil then
-  vis:feedkeys("E")
-  starting_pos =  vis.win.selection.pos
-  file:insert(starting_pos, ")(")
-    end
-  end
-end
 function match_next_sexp (pos) --pos + 1 ?
   local Range = {}
   local I = lpeg.Cp()
@@ -115,17 +91,14 @@ function match_next_sexp (pos) --pos + 1 ?
   return Range
 end
 
-
-
-function match_next_sexp_two(pos) --pos + 1 ?
+function match_next_simple_sexp (pos) --pos + 1 ?
   local Range = {}
   local I = lpeg.Cp()
   local text = vis.win.file:content(pos + 1,vis.win.file.size)
-  local start, finish = match(S(" \n")^0 * I  * complete_balanced_sexp * I, text  )
+  local start, finish = match(S(" \n")^0 * I  * simple_sexp * I, text  )
   if start ~= nil then
     Range.start , Range.finish = pos + start, pos + finish
   end
-  -- print_two(Range.start,Range.finish)
   return Range
 end
 
@@ -193,6 +166,24 @@ function slurp_sexp_backwards ()
   end
 end
 
+function search_top_sexp (start_pos, pos, text)
+  local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
+  if finish ~= nil then
+    if finish > pos then
+      return start - 1, finish
+    else
+      return search_top_sexp (finish, pos , text)
+    end
+  else   return -1
+  end
+end
+
+function top_sexp_at_cursor ()
+  local  pos =  vis.win.selection.pos
+  local text = vis.win.file:content(0,  vis.win.file.size)
+  return  search_top_sexp (0, pos, text)
+end
+
 vis.events.subscribe(vis.events.WIN_OPEN, function()
   vis:map(vis.modes.INSERT, "(", balance_sexp("(") )
   vis:map(vis.modes.INSERT, "[", balance_sexp("[") )
@@ -201,7 +192,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
   if is_lisp_file() ~= nil then
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
-   vis:map(vis.modes.NORMAL,  '<Space>b', get_sexp_at_cursor)
+  vis:map(vis.modes.NORMAL,  '<Space>b', top_sexp_at_cursor)
  end
 end)
 
