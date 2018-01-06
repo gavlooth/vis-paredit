@@ -13,6 +13,7 @@ function paredit_remove_filetype (x)
 end
 
 
+
 function paredit_add_filetype (x)
   if type(x) == "string" then
     table.insert(lisp_file_types, x)
@@ -232,6 +233,21 @@ function slice_sexp ( )
 end
 
 
+function make_sexp_wraper (x)
+  function wrap_sexp ()
+    local  pos =  vis.win.selection.pos
+    local file = vis.win.file
+    local text = vis.win.file:content(0,  vis.win.file.size)
+    left , right = lowest_level_sexp (pos + 1 )
+    if left ~= nil then
+      file:insert(left,  x )
+      file:insert(right - 1, match_sexp[x])
+      vis.win.selection.pos = pos
+    end
+  end
+  return wrap_sexp
+end
+
 
 vis.events.subscribe(vis.events.WIN_OPEN, function()
   vis:map(vis.modes.INSERT, "(", balance_sexp("(") )
@@ -241,8 +257,9 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
   if is_lisp_file() ~= nil then
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
-  vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
- end
+   vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
+   vis:map(vis.modes.NORMAL,  '<Space>(', make_sexp_wraper("("))
+end
 end)
 
 
