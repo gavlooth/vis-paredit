@@ -186,9 +186,9 @@ function lowest_level_sexp (pos)
   function travers_sexp (start_pos, pos, text)
     local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
     if finish ~= nil then
-      if finish > pos and start > pos then
+      if  start > pos and finish > pos then
         return -1
-      elseif finish >= pos and start <= pos then
+      elseif start <= pos and finish > pos then
         enclosing_sexp_start, enclosing_sexp_end  = start , finish
         travers_sexp (start + 1 , pos , text)
       elseif finish < pos then
@@ -221,12 +221,12 @@ function slice_sexp ( )
   local  pos =  vis.win.selection.pos
   local file = vis.win.file
   local text = vis.win.file:content(0,  vis.win.file.size)
-  left , right = lowest_level_sexp ( pos)
+  left , right = lowest_level_sexp (pos + 1 )
   if left ~= nil then
     file:delete(left, 1)
     file:insert(left,  " ")
     file:delete(right - 1, 1)
-    file:insert(right - 1,  "  ")
+    file:insert(right - 1,  " ")
     vis.win.selection.pos = pos
   end
 end
