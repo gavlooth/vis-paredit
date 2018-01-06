@@ -187,7 +187,6 @@ function lowest_level_sexp (pos)
     local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
     if finish ~= nil then
       if finish > pos and start > pos then
-        print_two (start, finish)
         return -1
       elseif finish >= pos and start <= pos then
         enclosing_sexp_start, enclosing_sexp_end  = start , finish
@@ -199,13 +198,13 @@ function lowest_level_sexp (pos)
     end
   end
   travers_sexp(0,pos, text)
-  return enclosing_sexp_start - 1, enclosing_sexp_end
+  return enclosing_sexp_start - 1, enclosing_sexp_end -1
 end
 
 function test_me ()
   local  pos =  vis.win.selection.pos
   local a,b =   lowest_level_sexp(pos)
-   print("----" .. vis.win.file:content(a, b - a -1).. "....")
+   print("----" .. vis.win.file:content(a, b - a).. "....")
 end
 
 
@@ -216,6 +215,24 @@ function top_sexp_at_cursor ()
   return  search_top_sexp (0, pos, text)
 end
 
+
+
+function slice_sexp ( )
+  local  pos =  vis.win.selection.pos
+  local file = vis.win.file
+  local text = vis.win.file:content(0,  vis.win.file.size)
+  left , right = lowest_level_sexp ( pos)
+  if left ~= nil then
+    file:delete(left, 1)
+    file:insert(left,  " ")
+    file:delete(right - 1, 1)
+    file:insert(right - 1,  "  ")
+    vis.win.selection.pos = pos
+  end
+end
+
+
+
 vis.events.subscribe(vis.events.WIN_OPEN, function()
   vis:map(vis.modes.INSERT, "(", balance_sexp("(") )
   vis:map(vis.modes.INSERT, "[", balance_sexp("[") )
@@ -224,7 +241,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
   if is_lisp_file() ~= nil then
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
-  vis:map(vis.modes.NORMAL,  '<Space>b', test_me)
+  vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
  end
 end)
 
