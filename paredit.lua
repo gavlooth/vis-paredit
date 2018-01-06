@@ -169,14 +169,46 @@ end
 function search_top_sexp (start_pos, pos, text)
   local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
   if finish ~= nil then
-    if finish > pos then
+    if finish >= pos and start <= pos then
       return start - 1, finish
     else
       return search_top_sexp (finish, pos , text)
     end
-  else   return -1
+  else  return -1
   end
 end
+
+
+
+function lowest_level_sexp (pos)
+  local text = vis.win.file:content(0, vis.win.file.size)
+  local enclosing_sexp_start ,  enclosing_sexp_end =  0, vis.win.file.size
+  function travers_sexp (start_pos, pos, text)
+    local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
+    if finish ~= nil then
+      if finish > pos and start > pos then
+        print_two (start, finish)
+        return -1
+      elseif finish >= pos and start <= pos then
+        enclosing_sexp_start, enclosing_sexp_end  = start , finish
+        travers_sexp (start + 1 , pos , text)
+      elseif finish < pos then
+        travers_sexp (start + 1 , pos , text)
+      end
+    else  return -1
+    end
+  end
+  travers_sexp(0,pos, text)
+  return enclosing_sexp_start - 1, enclosing_sexp_end
+end
+
+function test_me ()
+  local  pos =  vis.win.selection.pos
+  local a,b =   lowest_level_sexp(pos)
+   print("----" .. vis.win.file:content(a, b - a -1).. "....")
+end
+
+
 
 function top_sexp_at_cursor ()
   local  pos =  vis.win.selection.pos
@@ -192,7 +224,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
   if is_lisp_file() ~= nil then
    vis:map(vis.modes.NORMAL,  '<Space>l', slurp_sexp_forward)
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
-  vis:map(vis.modes.NORMAL,  '<Space>b', top_sexp_at_cursor)
+  vis:map(vis.modes.NORMAL,  '<Space>b', test_me)
  end
 end)
 
