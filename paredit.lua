@@ -1,7 +1,6 @@
 -- load standard vis module,  providing parts of the Lua API
 require('vis')
 
-
 lisp_file_types ={"clj", "cljs" , "lisp", "cljx", "cljc", "edn"}
 
 function paredit_remove_filetype (x)
@@ -11,8 +10,6 @@ function paredit_remove_filetype (x)
     end
   end
 end
-
-
 
 function paredit_add_filetype (x)
   if type(x) == "string" then
@@ -28,6 +25,7 @@ local char_sexp_literals = P{"\\" * S('(){}[]"') }
 local char_literals = P{"\\" * (l.graph -  S("n\"\\"))}
 local str_pattern = ('"' *  ( ( P("\\\"") +    (1 -  S('"'))))^0 * '"')
 local strings_and_chars = str_pattern + char_sexp_literals
+local lisp_word = (((l.graph -  S("(){}[]\"\\")) + char_literals))^1
 
 function find_first (p)
  local I = lpeg.Cp ()
@@ -44,27 +42,23 @@ return match(find_first (matcher), ex)
 end
 
 
-
-
-simple_sexp = P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
+local simple_sexp = P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
 ("[" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * "]") +
 ("{" * ((1 - S("(){}[]\"")) + strings_and_chars  + lpeg.V(1))^0 * "}")}
 
 
-
-complete_balanced_sexp =   P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
+local complete_balanced_sexp =   P{("(" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * ")") +
 ("[" * ((1 - S("(){}[]\"")) + strings_and_chars + lpeg.V(1))^0 * "]") +
 ("{" * ((1 - S("(){}[]\"")) + strings_and_chars  + lpeg.V(1))^0 * "}") +
 (((l.graph -  S("(){}[]\"\\")) + char_literals))^1+ str_pattern^1  }
 
-match_sexp = {["("] = ")",
+local match_sexp = {["("] = ")",
 [")"] = "(",
 ["["] = "]",
 ["]"] = "[",
 ["{"] = "}",
 ["}"] = "{",
 ["\""]="\"" }
-
 
 
 --This function returns a patternt that skips as many characters
@@ -81,8 +75,7 @@ return  match(complete_balanced_sexp , text)
 end
 
 
-function match_next_sexp (pos) --pos + 1 ?
-  local Range = {}
+function match_next_sexp (pos)   local Range = {}
   local I = lpeg.Cp()
   local text = vis.win.file:content(pos + 1,vis.win.file.size)
   local start, finish = match(S(" \n")^0 * I  * complete_balanced_sexp * I, text  )
@@ -92,7 +85,7 @@ function match_next_sexp (pos) --pos + 1 ?
   return Range
 end
 
-function match_next_simple_sexp (pos) --pos + 1 ?
+function match_next_simple_sexp (pos)
   local Range = {}
   local I = lpeg.Cp()
   local text = vis.win.file:content(pos + 1,vis.win.file.size)
@@ -113,6 +106,12 @@ end
 function match_previus_sexp (pos)
   local text_trimmed =  vis.win.file:content(0,pos)
   return match(last_occurance(complete_balanced_sexp), text_trimmed)
+end
+
+
+function match_previus_lisp_word (pos)
+  local text_trimmed =  vis.win.file:content(0,pos)
+  return match(last_occurance(lisp_word), text_trimmed)
 end
 
 
@@ -232,7 +231,6 @@ function slice_sexp ( )
   end
 end
 
-
 function make_sexp_wraper (x)
   function wrap_sexp ()
     local  pos =  vis.win.selection.pos
@@ -249,6 +247,28 @@ function make_sexp_wraper (x)
 end
 
 
+
+function split_sexp ( )
+  local pos =  vis.win.selection.pos
+  local file = vis.win.file
+  local text = vis.win.file:content(0,  vis.win.file.size)
+  local left , right = lowest_level_sexp (pos + 1 )
+  local split_pos = match_previus_lisp_word (pos + 1)
+if left ~ -1 then
+ local s_type = vis.win.file:content(left ,  1)
+  if vis.win.file:content(pos,  1) == " "then
+  file:insert(pos - 1 ,  match_sexp[s_type] )
+  file:insert(pos, " " .. s_type )
+  vis.win.selection.pos = pos
+  else
+  file:insert(split_pos - 1 ,  match_sexp[s_type] )
+  file:insert(split_pos, " " .. s_type )
+  vis.win.selection.pos = split_pos
+end
+end
+end
+
+
 vis.events.subscribe(vis.events.WIN_OPEN, function()
   vis:map(vis.modes.INSERT, "(", balance_sexp("(") )
   vis:map(vis.modes.INSERT, "[", balance_sexp("[") )
@@ -259,8 +279,12 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
    vis:map(vis.modes.NORMAL,  '<Space>h',  slurp_sexp_backwards  )
    vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
    vis:map(vis.modes.NORMAL,  '<Space>(', make_sexp_wraper("("))
-end
+   vis:map(vis.modes.NORMAL,  '<Space>o', split_sexp)
+   -- vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
+ end
 end)
+
+
 
 
 --
