@@ -253,19 +253,29 @@ function split_sexp ( )
   local file = vis.win.file
   local text = vis.win.file:content(0,  vis.win.file.size)
   local left , right = lowest_level_sexp (pos + 1 )
-  local split_pos = match_previus_lisp_word (pos + 1)
-if left ~ -1 then
- local s_type = vis.win.file:content(left ,  1)
-  if vis.win.file:content(pos,  1) == " "then
-  file:insert(pos - 1 ,  match_sexp[s_type] )
-  file:insert(pos, " " .. s_type )
-  vis.win.selection.pos = pos
-  else
-  file:insert(split_pos - 1 ,  match_sexp[s_type] )
-  file:insert(split_pos, " " .. s_type )
-  vis.win.selection.pos = split_pos
-end
-end
+  local cursor_char = vis.win.file:content(pos,  1)
+  local split_pos = match_previus_lisp_word(pos + 1)
+  if left ~= -1 then
+    local s_type = vis.win.file:content(left ,  1)
+   if left == pos then
+      file:insert(pos + 1 , match_sexp[s_type] )
+      file:insert(pos + 2 , s_type )
+      vis.win.selection.pos = pos + 2
+    elseif vis.win.file:content(pos,  1) == " "then
+      file:insert(pos , s_type )
+      file:insert(pos ,  match_sexp[s_type] )
+      vis.win.selection.pos = pos
+    elseif  right == pos + 1 then
+      file:insert(pos   ,  match_sexp[s_type] )
+      file:insert(pos + 1,  s_type )
+      vis.win.selection.pos = pos
+    else
+      file:insert(split_pos - 1 ,  match_sexp[s_type] )
+      file:insert(split_pos , s_type )
+      vis.win.selection.pos = split_pos
+      vis.win.selection.pos = pos
+    end
+  end
 end
 
 
