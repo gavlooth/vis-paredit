@@ -52,6 +52,10 @@ local complete_balanced_sexp =   P{("(" * ((1 - S("(){}[]\"")) + strings_and_cha
 ("{" * ((1 - S("(){}[]\"")) + strings_and_chars  + lpeg.V(1))^0 * "}") +
 (((l.graph -  S("(){}[]\"\\")) + char_literals))^1+ str_pattern^1  }
 
+
+local empty_sexp = P{( "(" *  S(" \n")^0  * ")") +
+( "[" *  S(" \n")^0  * "]") + ( "{" *  S(" \n")^0  * "}")}
+
 local match_sexp = {["("] = ")",
 [")"] = "(",
 ["["] = "]",
@@ -74,6 +78,10 @@ local text = vis.win.file:content(start ,  finish - start)
 return  match(complete_balanced_sexp , text)
 end
 
+
+function is_sexp_empty ()
+
+end
 
 function match_next_sexp (pos)   local Range = {}
   local I = lpeg.Cp()
