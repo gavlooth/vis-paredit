@@ -33,12 +33,15 @@ function find_first (p)
 end
 
 function is_lisp_file ()
-local ex = vis.win.file.name
-local matcher = lpeg.P(lisp_file_types[1]) * P(-1)
-for i = 2, #lisp_file_types do
-matcher = matcher + lpeg.P(lisp_file_types[i] ) * P(-1)
-end
-return match(find_first (matcher), ex)
+  local ex = vis.win.file.name
+  if ex~=nil then
+    local matcher = lpeg.P(lisp_file_types[1]) * P(-1)
+    for i = 2, #lisp_file_types do
+      matcher = matcher + lpeg.P(lisp_file_types[i] ) * P(-1)
+    end
+    return match(find_first (matcher), ex)
+  else return nil
+  end
 end
 
 
@@ -157,22 +160,7 @@ function balance_sexp (key)
   end
 end
 
-function slurp_sexp_forward ()
-  local file, pos = vis.win.file,  vis.win.selection.pos
-  local sexp_pos = match_next_sexp(pos)
-  move_sexp(pos, sexp_pos.finish)
-end
 
-function slurp_sexp_backwards ()
-  local  pos = vis.win.selection.pos
-  local start, finish = match_previus_sexp(pos)
-  if start == nil then
-
-    move_sexp(pos,nil)
-  else
-    move_sexp(pos,start - 1)
-  end
-end
 
 function search_top_sexp (start_pos, pos, text)
   local start, finish = match (lpeg.P{ lpeg.Cp() * simple_sexp * lpeg.Cp() + 1 * lpeg.V(1) } , text, start_pos + 1)
@@ -185,7 +173,6 @@ function search_top_sexp (start_pos, pos, text)
   else  return -1
   end
 end
-
 
 
 function lowest_level_sexp (pos)
@@ -209,6 +196,34 @@ function lowest_level_sexp (pos)
   return enclosing_sexp_start - 1, enclosing_sexp_end -1
 end
 
+
+function slurp_sexp_forward ()
+  local file, pos = vis.win.file,  vis.win.selection.pos
+  local start, finish  = lowest_level_sexp(pos)
+  local this_sexp = file:content(start  , finish - start )
+  local cursor_char = vis.win.file:content(pos,1)
+  if match_sexp[cursor_char] == "(" then
+    local sexp_pos = match_next_sexp(pos)
+    move_sexp(pos, sexp_pos.finish)
+  else
+    if  match(empty_sexp, this_sexp) ~= nil then
+      vis.win.selection.pos = finish - 1
+      slurp_sexp_forward ()
+    end
+  end
+end
+
+function slurp_sexp_backwards ()
+  local  pos = vis.win.selection.pos
+  local start, finish = match_previus_sexp(pos)
+  if start == nil then
+
+    move_sexp(pos,nil)
+  else
+    move_sexp(pos,start - 1)
+  end
+end
+
 function test_me ()
   local  pos =  vis.win.selection.pos
   local a,b =   lowest_level_sexp(pos)
@@ -222,7 +237,6 @@ function top_sexp_at_cursor ()
   local text = vis.win.file:content(0,  vis.win.file.size)
   return  search_top_sexp (0, pos, text)
 end
-
 
 
 function slice_sexp ( )
@@ -298,7 +312,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
    vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
    vis:map(vis.modes.NORMAL,  '<Space>(', make_sexp_wraper("("))
    vis:map(vis.modes.NORMAL,  '<Space>o', split_sexp)
-   -- vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
+  -- vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
  end
 end)
 
