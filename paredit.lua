@@ -337,7 +337,6 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
    vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
    vis:map(vis.modes.NORMAL,  '<Space>(', make_sexp_wraper("("))
    vis:map(vis.modes.NORMAL,  '<Space>o', split_sexp)
-   vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
  end
 end)
 
