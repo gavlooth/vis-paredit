@@ -200,13 +200,13 @@ end
 function slurp_sexp_forward ()
   local file, pos = vis.win.file,  vis.win.selection.pos
   local start, finish  = lowest_level_sexp(pos)
-  local this_sexp = file:content(start  , finish - start )
   local cursor_char = vis.win.file:content(pos,1)
   if match_sexp[cursor_char] == "(" then
     local sexp_pos = match_next_sexp(pos)
     move_sexp(pos, sexp_pos.finish)
   else
-    if  match(empty_sexp, this_sexp) ~= nil then
+
+    if  match(empty_sexp, file:content(start  , finish - start )) ~= nil then
       vis.win.selection.pos = finish - 1
       slurp_sexp_forward ()
     end
@@ -214,22 +214,47 @@ function slurp_sexp_forward ()
 end
 
 function slurp_sexp_backwards ()
-  local  pos = vis.win.selection.pos
-  local start, finish = match_previus_sexp(pos)
-  if start == nil then
+  local file, pos = vis.win.file,  vis.win.selection.pos
+  local start_2, finish_2  = lowest_level_sexp(pos)
+  local cursor_char = vis.win.file:content(pos,1)
 
-    move_sexp(pos,nil)
+  if match_sexp[cursor_char] == ")" then
+    local start, finish = match_previus_sexp(pos)
+    if start == nil then
+      move_sexp(pos,nil)
+    else
+      move_sexp(pos,start - 1)
+    end
   else
-    move_sexp(pos,start - 1)
+    if  match(empty_sexp, file:content(start_2, finish_2- start_2)) ~= nil then
+      vis.win.selection.pos = start_2
+      slurp_sexp_backwards ()
+    end
   end
 end
+
+
+--function slurp_sexp_forward ()
+--  local file, pos = vis.win.file,  vis.win.selection.pos
+--  local start, finish  = lowest_level_sexp(pos)
+--  local this_sexp = file:content(start  , finish - start )
+--  local cursor_char = vis.win.file:content(pos,1)
+--  if match_sexp[cursor_char] == "(" then
+--    local sexp_pos = match_next_sexp(pos)
+--    move_sexp(pos, sexp_pos.finish)
+--  else
+--    if  match(empty_sexp, this_sexp) ~= nil then
+--      vis.win.selection.pos = finish - 1
+--      slurp_sexp_forward ()
+--    end
+--  end
+--end
 
 function test_me ()
   local  pos =  vis.win.selection.pos
   local a,b =   lowest_level_sexp(pos)
    print("----" .. vis.win.file:content(a, b - a).. "....")
 end
-
 
 
 function top_sexp_at_cursor ()
@@ -312,7 +337,7 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
    vis:map(vis.modes.NORMAL,  '<Space>b', slice_sexp)
    vis:map(vis.modes.NORMAL,  '<Space>(', make_sexp_wraper("("))
    vis:map(vis.modes.NORMAL,  '<Space>o', split_sexp)
-  -- vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
+   vis:map(vis.modes.NORMAL,  '<Space>j', split_sexp)
  end
 end)
 
