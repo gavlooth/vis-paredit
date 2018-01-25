@@ -137,13 +137,17 @@ function move_sexp (current_pos, target_pos)
   elseif match_sexp[cursor_char] == nil then
     blink_error(lexers.STYLE_INFO)
   elseif match_sexp[cursor_char] ~= nil then
-    file:insert(target_pos,  cursor_char)
     if current_pos > target_pos then
       file:delete(current_pos + 1, 1)
-      vis.win.selection.pos = target_pos
+      vis.win.selection.pos = current_pos
+      file:insert(target_pos - 1,  cursor_char)
+      vis.win.selection.pos = target_pos - 1
     elseif current_pos < target_pos then
       file:delete(current_pos, 1)
+      vis.win.selection.pos =current_pos
+      file:insert(target_pos - 1,  cursor_char)
       vis.win.selection.pos = target_pos - 1
+    --  vis.win.selection.pos = target_pos - 1
     end
   end
 end
