@@ -1,4 +1,5 @@
 -- load standard vis module,  providing parts of the Lua API
+
 require('vis')
 
 lisp_file_types ={"clj", "cljs" , "lisp", "cljx", "cljc", "edn"}
@@ -68,13 +69,35 @@ local match_sexp = {["("] = ")",
 ["\""]="\"" }
 
 
---This function returns a patternt that skips as many characters
---in order to find the given patternt
-
-
 function print_two (a,b)
   print ("  " .. tostring (a) .. "--" .. tostring(b))
 end
+
+
+function prinf (a,b,c)
+ vis:info("  " .. tostring(a) .. " " .. tostring (b) .. " " .. tostring (c) )
+end
+
+
+function prinmsg (a,b,c)
+ vis:message("  " .. tostring(a) .. " " .. tostring (b) .. " " .. tostring (c) )
+end
+
+
+
+function trim_space_around (pos)
+  local file = vis.win.file
+  local text = file:content(0,  vis.win.file.size)
+  if  match ( S('\r\n\f\t ')^1, file:content(pos,  1)) and pos > 0 then
+    local _ , start_pos = match (last_occurance(l.graph),vis.win.file:content(0, pos )  )
+    local end_pos, _ = match(next_occurance(l.graph),file:content(pos + 1, file.size -pos -1 ) )
+    file:delete(start_pos, end_pos + pos - start_pos   )
+    vis.win.selection.pos = start_pos -1
+  end
+  return pos
+end
+
+
 
 function is_sexp (start, finish)
 local text = vis.win.file:content(start ,  finish - start)
@@ -113,6 +136,13 @@ function last_occurance (p)
   return lpeg.P{(I * p * I * lpeg.S(" \n")^0 * lpeg.P(-1)) + 1 * lpeg.V(1)}
 end
 
+
+
+
+function next_occurance (p)
+  local I = lpeg.Cp ()
+  return lpeg.P{(I * p * I + 1 * lpeg.V(1))}
+end
 
 function match_previus_sexp (pos)
   local text_trimmed =  vis.win.file:content(0,pos)
@@ -298,33 +328,45 @@ function make_sexp_wraper (x)
 end
 
 
-
 function split_sexp ( )
   local pos =  vis.win.selection.pos
   local file = vis.win.file
-  local text = vis.win.file:content(0,  vis.win.file.size)
+  local pos =  vis.win.selection.pos
+  file:insert(pos  , " ")
+  file:delete(pos, 1  )
+  vis.win.selection.pos = pos
+  trim_space_around (vis.win.selection.pos)
+  pos =  vis.win.selection.pos
+  local text = file:content(0,  vis.win.file.size)
   local left , right = lowest_level_sexp (pos + 1 )
   local cursor_char = vis.win.file:content(pos,  1)
   local split_pos = match_previus_lisp_word(pos + 1)
+
   if left ~= -1 then
     local s_type = vis.win.file:content(left ,  1)
-   if left == pos then
-      file:insert(pos + 1 , match_sexp[s_type] )
-      file:insert(pos + 2 , s_type )
-      vis.win.selection.pos = pos + 2
-    elseif vis.win.file:content(pos,  1) == " "then
-      file:insert(pos , s_type )
-      file:insert(pos ,  match_sexp[s_type] )
-      vis.win.selection.pos = pos
-    elseif  right == pos + 1 then
+
+   if match(S('\r\n\f\t ')^1, cursor_char) then
       file:insert(pos   ,  match_sexp[s_type] )
+      file:insert(pos + 2 , s_type )
+      vis.win.selection.pos = pos+2
+    elseif left == pos then
+      file:insert(pos, s_type )
+      file:insert(pos , match_sexp[s_type] )
+      vis.win.selection.pos = pos +2
+     -- prinf ("1")
+    elseif  right == pos + 1 then
+      vis.win.selection.pos = pos
+      file:insert(pos   ,  match_sexp[s_type] )
+      vis.win.selection.pos = pos
       file:insert(pos + 1,  s_type )
-      vis.win.selection.pos = pos
+      vis.win.selection.pos = pos + 1
+    -- prinf ("3")
     else
-      file:insert(split_pos - 1 ,  match_sexp[s_type] )
-      file:insert(split_pos , s_type )
-      vis.win.selection.pos = split_pos
-      vis.win.selection.pos = pos
+      local _ , new_pos = match (last_occurance(l.graph),vis.win.file:content(0,  split_pos - 1)  )
+      file:insert(new_pos - 1 ,  match_sexp[s_type] )
+      file:insert(split_pos, s_type )
+     vis.win.selection.pos = 1 + trim_space_around (new_pos )
+      -- prinf ("4")
     end
   end
 end
@@ -343,15 +385,4 @@ vis.events.subscribe(vis.events.WIN_OPEN, function()
    vis:map(vis.modes.NORMAL,  '<Space>o', split_sexp)
  end
 end)
-
-
-
-
---
--- vis.events.subscribe(vis.events.WIN_OPEN, function(win)
---
---
--- end)
---
---
 
