@@ -9,16 +9,14 @@ bindings, none of them feed keys to emulate structural editing.
 For now the following functions  are implemented
 
 
- slurp_sexp_backwards
-
- slice_sexp
-
- make_sexp_wraper
-
- split_sexp
+* slurp sexp
+* burf sexp
+* slice sexp
+* wrap sexp
+* split sexp
 
 You can find them at the bottom of paredit.lua, binded to Space based key compinations
 This is because in neovim space is my Leader. Just change them if you dont like, untill I implement a
-leader key properly (Or you can implement it*)
+leader key properly (Or you can implement it)
  This is the first time I write Lua code and used PEGs so probably the code
  can be improved.
