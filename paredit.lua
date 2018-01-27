@@ -168,10 +168,10 @@ function move_sexp (current_pos, target_pos)
     blink_error(lexers.STYLE_INFO)
   elseif match_sexp[cursor_char] ~= nil then
     if current_pos > target_pos then
-      file:delete(current_pos + 1, 1)
+      file:delete(current_pos, 1)
       vis.win.selection.pos = current_pos
-      file:insert(target_pos - 1,  cursor_char)
-      vis.win.selection.pos = target_pos - 1
+      file:insert(target_pos,  cursor_char)
+      vis.win.selection.pos = target_pos
     elseif current_pos < target_pos then
       file:delete(current_pos, 1)
       vis.win.selection.pos =current_pos
@@ -235,12 +235,11 @@ function slurp_sexp_forward ()
   local file, pos = vis.win.file,  vis.win.selection.pos
   local start, finish  = lowest_level_sexp(pos)
   local cursor_char = vis.win.file:content(pos,1)
-  if match_sexp[cursor_char] == "(" then
+  if  match( S(')]}'), cursor_char)~= nil then
     local sexp_pos = match_next_sexp(pos)
     move_sexp(pos, sexp_pos.finish)
   else
-
-    if  match(empty_sexp, file:content(start  , finish - start )) ~= nil then
+    if   match(empty_sexp, file:content(start  , finish - start )) ~= nil then
       vis.win.selection.pos = finish - 1
       slurp_sexp_forward ()
     end
@@ -251,8 +250,7 @@ function slurp_sexp_backwards ()
   local file, pos = vis.win.file,  vis.win.selection.pos
   local start_2, finish_2  = lowest_level_sexp(pos)
   local cursor_char = vis.win.file:content(pos,1)
-
-  if match_sexp[cursor_char] == ")" then
+  if match(   S('([{'),  cursor_char)~= nil then
     local start, finish = match_previus_sexp(pos)
     if start == nil then
       move_sexp(pos,nil)
@@ -260,7 +258,8 @@ function slurp_sexp_backwards ()
       move_sexp(pos,start - 1)
     end
   else
-    if  match(empty_sexp, file:content(start_2, finish_2- start_2)) ~= nil then
+  if start_2 > -1 and  match(empty_sexp, file:content(start_2, finish_2- start_2)) ~= nil then
+    prinf(3)
       vis.win.selection.pos = start_2
       slurp_sexp_backwards ()
     end
